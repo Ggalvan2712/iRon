@@ -10,7 +10,8 @@ The project's code base aims to be small, easy to modify, and free of external d
 
 - [Where to Download](#where-to-download)
 - [Overlays](#overlays)
-  - [*Relative*](#relative)
+- [*Relative*](#relative)
+- [*Map*](#map)
   - [*DDU*](#ddu)
   - [*Inputs*](#inputs)
   - [*Standings*](#standings)
@@ -37,6 +38,12 @@ Like the *Relative* box in iRacing, but with additional information such as lice
 At the top is an optional minimap. It can be set to either relative mode (own car fixed in the center) or absolute mode (start/finish line fixed in the center).
 
 ![relative](https://github.com/lespalt/iRon/blob/main/relative.png?raw=true)
+
+### *Map*
+
+Builds a simple track map based on the car's position after completing
+one lap. The map is drawn using the telemetry-provided speed and yaw
+data, and becomes visible once enough data has been gathered.
 
 ### *DDU*
 
