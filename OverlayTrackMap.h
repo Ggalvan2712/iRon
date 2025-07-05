@@ -25,11 +25,14 @@ SOFTWARE.
 #pragma once
 
 #include <vector>
+#include <string>
 #include <float.h>
 #include <math.h>
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
+#include "util.h"
+#include "picojson.h"
 
 class OverlayTrackMap : public Overlay
 {
@@ -44,10 +47,81 @@ protected:
     double             m_lastTime = 0.0;
     float              m_lastPct = 0.0f;
     bool               m_lapDone = false;
+    bool               m_mapReady = false;
+    std::string        m_mapFile;
 
     virtual float2 getDefaultSize()
     {
         return float2(200,200);
+    }
+
+    bool loadSavedMap()
+    {
+        std::string data;
+        if( !loadFile(m_mapFile, data) )
+            return false;
+
+        picojson::value v;
+        std::string err = picojson::parse(v, data);
+        if( !err.empty() || !v.is<picojson::array>() )
+            return false;
+
+        m_points.clear();
+        for( const picojson::value& pv : v.get<picojson::array>() )
+        {
+            if( !pv.is<picojson::array>() )
+                continue;
+            const auto& arr = pv.get<picojson::array>();
+            if( arr.size() != 2 )
+                continue;
+            Point pt;
+            pt.x = (float)arr[0].get<double>();
+            pt.y = (float)arr[1].get<double>();
+            m_points.push_back( pt );
+        }
+        return m_points.size()>1;
+    }
+
+    void saveMap()
+    {
+        picojson::array arr;
+        for( const Point& pt : m_points )
+        {
+            picojson::array a;
+            a.push_back( picojson::value((double)pt.x) );
+            a.push_back( picojson::value((double)pt.y) );
+            arr.push_back( picojson::value(a) );
+        }
+        picojson::value v(arr);
+        saveFile( m_mapFile, v.serialize() );
+    }
+
+    void buildMap()
+    {
+        if( m_points.size() < 2 )
+            return;
+
+        float minx=FLT_MAX, miny=FLT_MAX, maxx=-FLT_MAX, maxy=-FLT_MAX;
+        for( const Point& p : m_points )
+        {
+            if( p.x<minx ) minx=p.x;
+            if( p.y<miny ) miny=p.y;
+            if( p.x>maxx ) maxx=p.x;
+            if( p.y>maxy ) maxy=p.y;
+        }
+
+        if( (maxy-miny) > (maxx-minx) )
+        {
+            for( Point& p : m_points )
+            {
+                float ox = p.x;
+                p.x = p.y;
+                p.y = -ox;
+            }
+        }
+
+        saveMap();
+        m_mapReady = true;
     }
 
     virtual void onEnable()
@@ -56,6 +130,15 @@ protected:
         m_lastTime = ir_SessionTime.getDouble();
         m_lastPct = ir_LapDistPct.getFloat();
         m_lapDone = false;
+        m_mapReady = false;
+
+        char fname[256];
+        std::string cfg = ir_session.trackConfigName;
+        for( char& c : cfg ) if( !isalnum((unsigned char)c) ) c = '_';
+        sprintf( fname, "trackmap_%d_%s.json", ir_session.trackId, cfg.c_str() );
+        m_mapFile = fname;
+        if( loadSavedMap() )
+            m_mapReady = true;
     }
 
     virtual void onDisable()
@@ -69,26 +152,29 @@ protected:
         float dt = (float)(t - m_lastTime);
         m_lastTime = t;
 
-        float yaw = ir_Yaw.getFloat();
-        float speed = ir_Speed.getFloat();
+        if( !m_mapReady )
+        {
+            float yaw = ir_Yaw.getFloat();
+            float speed = ir_Speed.getFloat();
 
-        float dx = cosf(yaw) * speed * dt;
-        float dy = sinf(yaw) * speed * dt;
+            float dx = cosf(yaw) * speed * dt;
+            float dy = sinf(yaw) * speed * dt;
 
-        Point p = m_points.empty() ? Point{0,0} : m_points.back();
-        p.x += dx;
-        p.y += dy;
-        m_points.push_back(p);
+            Point p = m_points.empty() ? Point{0,0} : m_points.back();
+            p.x += dx;
+            p.y += dy;
+            m_points.push_back(p);
 
-        float pct = ir_LapDistPct.getFloat();
-        if( pct < m_lastPct && m_points.size() > 10 )
-            m_lapDone = true;
-        m_lastPct = pct;
+            float pct = ir_LapDistPct.getFloat();
+            if( pct < m_lastPct && m_points.size() > 10 )
+                m_lapDone = true;
+            m_lastPct = pct;
 
-        if( !m_lapDone )
-            return;
+            if( m_lapDone )
+                buildMap();
+        }
 
-        if( m_points.size() < 2 )
+        if( !m_mapReady || m_points.size()<2 )
             return;
 
         float minx=FLT_MAX, miny=FLT_MAX, maxx=-FLT_MAX, maxy=-FLT_MAX;

@@ -253,52 +253,41 @@ int irsdkClient::getVarInt(int idx, int entry)
 
 float irsdkClient::getVarFloat(int idx, int entry)
 {
-	if(isConnected())
-	{
-		const irsdk_varHeader *vh = irsdk_getVarHeaderEntry(idx);
-		if(vh)
-		{
-			if(entry >= 0 && entry < vh->count)
-			{
-				const char * data = m_data + vh->offset;
-				switch(vh->type)
-				{
-				// 1 byte
-				case irsdk_char:
-				case irsdk_bool:
-					return (float)(((const char*)data)[entry]);
-					break;
+    if (!isConnected())
+        return 0.0f;
 
-				// 4 bytes
-				case irsdk_int:
-				case irsdk_bitField:
-					return (float)(((const int*)data)[entry]);
-					break;
-					
-				case irsdk_float:
-					return (float)(((const float*)data)[entry]);
-					break;
+    const irsdk_varHeader* vh = irsdk_getVarHeaderEntry(idx);
+    if (!vh)
+    {
+        return 0.0f;
+    }
 
-				// 8 bytes
-				case irsdk_double:
-					return (float)(((const double*)data)[entry]);
-					break;
-				}
-			}
-			else
-			{
-				// invalid offset
-				assert(false);
-			}
-		}
-		else
-		{
-			//invalid variable index
-			assert(false);
-		}
-	}
+    if (entry < 0 || entry >= vh->count)
+    {
+        return 0.0f;
+    }
 
-	return 0.0f;
+    const char* data = m_data + vh->offset;
+
+    switch (vh->type)
+    {
+    case irsdk_char:
+    case irsdk_bool:
+        return (float)(((const char*)data)[entry]);
+
+    case irsdk_int:
+    case irsdk_bitField:
+        return (float)(((const int*)data)[entry]);
+
+    case irsdk_float:
+        return (float)(((const float*)data)[entry]);
+
+    case irsdk_double:
+        return (float)(((const double*)data)[entry]);
+
+    default:
+        return 0.0f;
+    }
 }
 
 double irsdkClient::getVarDouble(int idx, int entry)
