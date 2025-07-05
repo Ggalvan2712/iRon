@@ -44,6 +44,7 @@ protected:
     double             m_lastTime = 0.0;
     float              m_lastPct = 0.0f;
     bool               m_lapDone = false;
+    bool               m_rotated = false;
 
     virtual float2 getDefaultSize()
     {
@@ -56,6 +57,7 @@ protected:
         m_lastTime = ir_SessionTime.getDouble();
         m_lastPct = ir_LapDistPct.getFloat();
         m_lapDone = false;
+        m_rotated = false;
     }
 
     virtual void onDisable()
@@ -90,6 +92,29 @@ protected:
 
         if( m_points.size() < 2 )
             return;
+
+        if( !m_rotated )
+        {
+            float minx=FLT_MAX, miny=FLT_MAX, maxx=-FLT_MAX, maxy=-FLT_MAX;
+            for( const Point& pt : m_points )
+            {
+                if( pt.x < minx ) minx = pt.x;
+                if( pt.y < miny ) miny = pt.y;
+                if( pt.x > maxx ) maxx = pt.x;
+                if( pt.y > maxy ) maxy = pt.y;
+            }
+            if( (maxy-miny) > (maxx-minx) )
+            {
+                for( Point& pt : m_points )
+                {
+                    float nx = -pt.y;
+                    float ny = pt.x;
+                    pt.x = nx;
+                    pt.y = ny;
+                }
+            }
+            m_rotated = true;
+        }
 
         float minx=FLT_MAX, miny=FLT_MAX, maxx=-FLT_MAX, maxy=-FLT_MAX;
         for( const Point& pt : m_points )
